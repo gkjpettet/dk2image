@@ -8,68 +8,290 @@ Inherits ConsoleApplication
 		  using ShellFormat
 		  using DICOMKit
 		  
-		  dim f as Xojo.IO.FolderItem
-		  dim dcm as DICOMKit.ObjectDK
-		  dim p as Picture
-		  dim t1, ms1, ms2 as Integer
-		  dim t2 As Double
-		  
 		  ' Check at least one argument was passed
 		  if args.Ubound < 1 then
-		    Print Colourise("Error:", ShellColor.Red) + " no arguments passed."
-		    Quit
+		    Print Colourise("Error: ", ShellColor.Red) + "No input file specified."
+		    Quit()
 		  end if
 		  
-		  ' Grab the file path
+		  ' Process the arguments
 		  try
-		    f = new Xojo.IO.FolderItem(args(1).ToText)
-		  catch
-		    Print Colourise("Error:", ShellColor.Red) + " Invalid file path specified."
-		    Quit
+		    ProcessArguments(args)
+		  catch err as AppException
+		    Print Colourise("Error: ", ShellColor.Red) + err.Message
+		    Quit()
 		  end try
 		  
-		  ' Is this a DICOM file?
-		  if not DICOMKit.IsDICOM(f) then
-		    Print Colourise("Error:", ShellColor.Red) + " Not a DICOM file."
-		    Quit
-		  end if
-		  
-		  
-		  ' Get the image file and save it to the Desktop
+		  ' Has a valid DICOM file been passed?
 		  try
-		    ' Start counting
-		    t1 = Ticks()
-		    dcm = DICOMKit.Open(f)
-		    ' How long did it take to parse?
-		    t2 = (Ticks() - t1)/60*1000
-		    ms1 = t2
-		    try
-		      ' Start counting
-		      t1 = Ticks()
-		      p = dcm.ToPicture()
-		      ' How long did it take to parse?
-		      t2 = (Ticks() - t1)/60*1000
-		      ms2 = t2
-		      try
-		        p.Save(SpecialFolder.Desktop.Child("test.jpg"), Picture.SaveAsJPEG)
-		      catch
-		        Print Colourise("Error:", ShellColor.Red) + " A problem occurred trying to save the JPEG to disk."
-		        Quit
-		      end try
-		    catch
-		      Print Colourise("Error:", ShellColor.Red) + " Unable to extract the image from the DICOM file."
-		      Quit
-		    end try
-		  catch
-		    Print Colourise("Error:", ShellColor.Red) + " A problem occurred trying to parse the DICOM file."
-		    Quit
+		    if not DICOMKit.IsDICOM(dcmFile) then
+		      if not quietMode then
+		        Print Colourise("Error: ", ShellColor.Red) + dcmFile.Name + " is not a DICOM file."
+		      end if
+		      Quit()
+		    end if
+		  catch err as ExceptionDK
+		    if not quietMode then Print Colourise("Error: ", ShellColor.Red) + err.Message
+		    Quit()
 		  end try
 		  
+		  ' Parse the DICOM file
+		  try
+		    dcm = DICOMKit.Open(dcmFile)
+		  catch err as ExceptionDK
+		    if not quietMode then Print Colourise("Error: ", ShellColor.Red) + err.Message
+		    Quit()
+		  end try
 		  
+		  ' Create the picture
 		  
-		  Print Colourise("Success!", ShellColor.Green) + " (" + ms1.ToText + " ms to parse, " + ms2.ToText + " ms to extract image)"
+		  ' We're done
+		  if not quietMode then Print "Done."
+		  return ERROR_NONE
 		End Function
 	#tag EndEvent
+
+
+	#tag Method, Flags = &h21
+		Private Function ArgumentDefined(argName as Text) As Boolean
+		  ' Takes an argument name and returns True if its been previously passed, False if not.
+		  ' Required as some arguments have both short (e.g. 'v') and long (e.g. 'verbose') forms.
+		  
+		  dim arg as Text
+		  
+		  if arguments.HasKey(argName) then return True
+		  
+		  if argName.Length = 1 then
+		    ' Get the long form of this argument
+		    try
+		      arg = ArgumentLongName(argName)
+		      return arguments.HasKey(arg)
+		    catch
+		      ' There is no long form version of this argument
+		      return False
+		    end try
+		  else
+		    ' Get the short form of this argument
+		    try
+		      arg = ArgumentShortName(argName)
+		      return arguments.HasKey(arg)
+		    catch
+		      ' There is no short form version of this argument
+		      return False
+		    end try
+		  end if
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Function ArgumentLongName(shortName as Text) As Text
+		  ' Takes the short form of an argument name and returns the long form version.
+		  ' Raises an exception if the argument passed is not recognised.
+		  
+		  select case shortName
+		  case "h"
+		    return "help"
+		  case "q"
+		    return "quiet"
+		  case "f"
+		    return "frame"
+		  case "fr"
+		    return "frame-range"
+		  case "fa"
+		    return "all-frames"
+		  case "rl"
+		    return "rotate-left"
+		  case "rr"
+		    return "rotate-right"
+		  case "fh"
+		    return "flip-horizontally"
+		  case "fv"
+		    return "flip-vertically"
+		  case "ww"
+		    return "set-window"
+		  case "oj"
+		    return "write-jpeg"
+		  case "op"
+		    return "write-png"
+		  case "ob"
+		    return "write-bmp"
+		  case "ot"
+		    return "write-tiff"
+		  case else
+		    dim err as new AppException(ARGUMENT_HAS_NO_LONGNAME, "Argument '" + _
+		    shortName + "' has no long form")
+		    raise err
+		  end select
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Function ArgumentShortName(longName as Text) As Text
+		  ' Takes the long form of an argument name and returns the short form version.
+		  ' Raises an exception if the argument passed is not recognised.
+		  
+		  select case longName
+		  case "help"
+		    return "h"
+		  case "quiet"
+		    return "q"
+		  case "frame"
+		    return "f"
+		  case "frame-range"
+		    return "fr"
+		  case "all-frames"
+		    return "fa"
+		  case "rotate-left"
+		    return "rl"
+		  case "rotate-right"
+		    return "rr"
+		  case "flip-horizontally"
+		    return "fh"
+		  case "flip-vertically"
+		    return "fv"
+		  case "set-window"
+		    return "ww"
+		  case "write-jpeg"
+		    return "oj"
+		  case "write-png"
+		    return "op"
+		  case "write-bmp"
+		    return "ob"
+		  case "write-tiff"
+		    return "ot"
+		  case else
+		    dim err as new AppException(ARGUMENT_HAS_NO_SHORTNAME, "Argument '" + _
+		    longName + "' has no short form")
+		    raise err
+		  end select
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Function OptionsExpected(argumentName as Text) As Integer
+		  ' Takes the name of an argument and returns how many options (if any) are expected.
+		  
+		  select case argumentName
+		  case "h", "help", "version", "q", "quiet", "fa", "all-frames", "rl", "rotate-left", _
+		    "rr", "rotate-right", "fh", "flip-horizontally", "fv", "flip-vertically", "oj", _
+		    "write-jpeg", "op", "write-png", "ob", "write-bmp", "ot", "write-tiff"
+		    return 0
+		  case "f", "frame"
+		    return 1
+		  case "fr", "frame-range", "ww", "set-window"
+		    return 2
+		  else ' unknown argument
+		    return 0
+		  end select
+		End Function
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Sub ProcessArguments(args() as String)
+		  dim a, optionsLeft as Integer
+		  dim argName, lastArgName as Text
+		  dim arg as Argument
+		  dim isArg as Boolean
+		  
+		  arguments = new Xojo.Core.Dictionary
+		  
+		  for a = 0 to args.Ubound
+		    argName = args(a).ToText
+		    if a = 0 then
+		      continue ' the 1st argument is always the app path
+		    elseif a = 1 then ' should be the input file
+		      try
+		        dcmFile = new Xojo.IO.FolderItem(argName)
+		      catch
+		        dim err as new AppException(ERROR_INVALID_INPUT_FILE, "Unable to open '" + _
+		        argName + "'")
+		        raise err
+		      end try
+		    elseif a = 2 and argName.Length > 3 and argName.Left(2) <> "--" then
+		      ' Could be the desired outputFile
+		      try
+		        outputFile = new Xojo.IO.FolderItem(argName)
+		      catch
+		        dim err as new AppException(ERROR_INVALID_OUTPUT_FILE, "Unable to create '" + _
+		        argName + "'")
+		        raise err
+		      end try
+		    else
+		      if argName.Length >= 1 and argName.Left(1) = "+" then
+		        isArg = True
+		        argName = argName.Replace("+", "")
+		      elseif argName.Length >= 2 and argName.Left(2) = "--" then
+		        isArg = True
+		        argName = argName.Replace("--", "")
+		      else
+		        isArg = False
+		      end if
+		      if isArg then
+		        if optionsLeft > 0 then
+		          ' Insufficent options passed for the preceding argument
+		          dim err as new AppException(ERROR_ARGUMENT_OPTION, "An insufficent number of options " + _
+		          "was passed for the " + lastArgName + " argument (" + OptionsExpected(lastArgName).ToText + _
+		          " required)")
+		          raise err
+		        end if
+		        ' A new argument
+		        ' if arguments.HasKey(argName) then
+		        if argumentDefined(argName) then
+		          ' This argument already exists
+		          dim err as new AppException(ERROR_DUPLICATE_ARGUMENT, "The argument '" + _
+		          argName + "' has already been specified")
+		          raise err
+		        else
+		          if not ValidArgument(argName) then
+		            dim err as new AppException(ERROR_INVALID_ARGUMENT, "The argument '" + _
+		            argName + "' is not recognised")
+		            raise err
+		          end if
+		          arguments.Value(argName) = new Argument(argName)
+		          ' How many options does this argument expect (if any)?
+		          optionsLeft = OptionsExpected(argName)
+		          ' Remember this argument's name
+		          lastArgName = argName
+		        end if
+		      else
+		        ' This is an option for the last argument
+		        if optionsLeft = 0 then
+		          dim err as new AppException(ERROR_ARGUMENT_OPTION, "Too many options passed for the " + _
+		          lastArgName + " argument (" + OptionsExpected(lastArgName).ToText + _
+		          " required)")
+		          raise err
+		        end if
+		        try
+		          Argument(arguments.Value(lastArgName)).options.Append(argName)
+		          optionsLeft = optionsLeft - 1
+		        catch
+		          dim err as new AppException(ERROR_ARGUMENT_OPTION, "No argument for the passed" + _
+		          " option was specified")
+		          raise err
+		        end try
+		      end if
+		    end if
+		  next a
+		  
+		  ' Set various modes (if required)
+		  quietMode = if(ArgumentDefined("quiet"), True, False)
+		End Sub
+	#tag EndMethod
+
+	#tag Method, Flags = &h21
+		Private Function ValidArgument(argumentName as Text) As Boolean
+		  ' Takes the name of an argument and returns how many options (if any) are expected.
+		  
+		  select case argumentName
+		  case "h", "help", "version", "q", "quiet", "f", "frame", "fr", "frame-range", "fa", "all-frames", _
+		    "rl", "rotate-left", "rr", "rotate-right", "fh", "flip-horizontally", "fv", "flip-vertically", _
+		    "ww", "set-window", "oj", "write-jpeg", "op", "write-png", "ob", "write-bmp", "ot", "write-tiff"
+		    return True
+		  else ' unknown argument
+		    return False
+		  end select
+		End Function
+	#tag EndMethod
 
 
 	#tag Note, Name = Arguments
@@ -107,63 +329,119 @@ Inherits ConsoleApplication
 		
 		OPTIONS
 		    general options
-		        -h    --help           
+		        +h    --help           
 		              Prints this help text and then exits
 		
 		              --version        
 		              Prints the version information and then exits
 		
-		        -q    --quiet          
+		        +q    --quiet          
 		              Quiet mode. Prints no warnings and errors
-		 
-		        -v    --verbose        
-		              Prints all processing details
 		
 		    image processing options
 		      frame selection
-		        -f     --frame         [n]umber: integer
+		        +f     --frame         [n]umber: integer
 		               select the specified frame (default: 1)
 		               e.g. dk2image someFile -f 4     (would select the 4th frame of someFile)
 		
-		        -fr    --frame-range   [n]umber [c]ount: integer
+		        +fr    --frame-range   [n]umber [c]ount: integer
 		               select [c] frames beginning with frame [n]
 		               e.g. dk2image someFile -fr 4 3  (would select frames 4, 5, 6 of someFile)
 		
-		        -fa    --all-frames    
+		        +fa    --all-frames    
 		               select all frames
 		
 		      rotation
-		        -rl    --rotate-left
+		        +rl    --rotate-left
 		               rotate the image left (-90 degrees, anti-clockwise) 
 		
-		        -rr    --rotate-right
+		        +rr    --rotate-right
 		               rotate the image right (+90 degrees, clockwise)
 		
 		      flipping
-		        -fh    --flip-horizontally
+		        +fh    --flip-horizontally
 		               flip the image horizontally
 		
-		        -fv    --flip-vertically
+		        +fv    --flip-vertically
 		               flip the image vertically
 		
 		      windowing
-		        -ww    --set-window   [c]entre [w]idth: float
+		        +ww    --set-window   [c]entre [w]idth: float
 		               set the image window using centre [c] and width [w]
 		
 		    output options
 		      image format
-		        -oj    --write-jpeg
+		        +oj    --write-jpeg
 		               Save the image as a JPEG
-		        -op    --write-png
+		        +op    --write-png
 		               Save the image as a PNG
-		        -ob    --write-bmp
+		        +ob    --write-bmp
 		               Save the image as a Windows BMP
-		        -ot    --write-tiff
+		        +ot    --write-tiff
 		               Save the image as a TIFF
 	#tag EndNote
 
 
+	#tag Property, Flags = &h21
+		#tag Note
+			The arguments passed to the app
+			Key is the argument name (e.g. "rotate-left") and Value (if set) is a the argument as an Argument class.
+		#tag EndNote
+		Private arguments As Xojo.Core.Dictionary
+	#tag EndProperty
+
+	#tag Property, Flags = &h21
+		Private dcm As DICOMKit.ObjectDK
+	#tag EndProperty
+
+	#tag Property, Flags = &h21
+		Private dcmFile As Xojo.IO.FolderItem
+	#tag EndProperty
+
+	#tag Property, Flags = &h21
+		Private outputFile As Xojo.IO.FolderItem
+	#tag EndProperty
+
+	#tag Property, Flags = &h0
+		#tag Note
+			Mutes all message output.
+		#tag EndNote
+		quietMode As Boolean = False
+	#tag EndProperty
+
+
+	#tag Constant, Name = ARGUMENT_HAS_NO_LONGNAME, Type = Double, Dynamic = False, Default = \"6", Scope = Public
+	#tag EndConstant
+
+	#tag Constant, Name = ARGUMENT_HAS_NO_SHORTNAME, Type = Double, Dynamic = False, Default = \"7", Scope = Public
+	#tag EndConstant
+
+	#tag Constant, Name = ERROR_ARGUMENT_OPTION, Type = Double, Dynamic = False, Default = \"2", Scope = Public
+	#tag EndConstant
+
+	#tag Constant, Name = ERROR_DUPLICATE_ARGUMENT, Type = Double, Dynamic = False, Default = \"3", Scope = Public
+	#tag EndConstant
+
+	#tag Constant, Name = ERROR_INVALID_ARGUMENT, Type = Double, Dynamic = False, Default = \"4", Scope = Public
+	#tag EndConstant
+
+	#tag Constant, Name = ERROR_INVALID_INPUT_FILE, Type = Double, Dynamic = False, Default = \"1", Scope = Public
+	#tag EndConstant
+
+	#tag Constant, Name = ERROR_INVALID_OUTPUT_FILE, Type = Double, Dynamic = False, Default = \"5", Scope = Public
+	#tag EndConstant
+
+	#tag Constant, Name = ERROR_NONE, Type = Double, Dynamic = False, Default = \"0", Scope = Public
+	#tag EndConstant
+
+
 	#tag ViewBehavior
+		#tag ViewProperty
+			Name="quietMode"
+			Group="Behavior"
+			InitialValue="False"
+			Type="Boolean"
+		#tag EndViewProperty
 	#tag EndViewBehavior
 End Class
 #tag EndClass
