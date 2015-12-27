@@ -18,6 +18,7 @@ Protected Module PixelData
 		  using DICOMKit
 		  
 		  dim offset, row, col, maxRows, maxCols as Integer
+		  dim rawValue as Auto
 		  dim image as Picture
 		  dim surface as RGBSurface
 		  dim minThreshold, maxThreshold, preCalc1, preCalc2, transformedValues(-1, -1) as Double
@@ -56,8 +57,9 @@ Protected Module PixelData
 		  case meta.UNSIGNED_8_BIT
 		    for row = 0 to maxRows
 		      for col = 0 to maxCols
+		        rawValue = data.UInt8Value(offset)
 		        ' Apply the rescale slope and intercept transformation to the raw value and store it
-		        transformedValues(row, col) = (meta.rescaleSlope * data.UInt8Value(offset)) + meta.rescaleIntercept
+		        transformedValues(row, col) = (meta.rescaleSlope * rawValue) + meta.rescaleIntercept
 		        ' Apply the windowing levels to this transformed pixel value (if not black)
 		        if transformedValues(row, col) > minThreshold then
 		          surface.pixel(col, row) = MonochromePixelColourAfterWindowing(transformedValues(row, col), _
@@ -70,8 +72,9 @@ Protected Module PixelData
 		  case meta.UNSIGNED_16_BIT
 		    for row = 0 to maxRows
 		      for col = 0 to maxCols
+		        rawValue = data.UInt16Value(offset)
 		        ' Apply the rescale slope and intercept transformation to the raw value and store it
-		        transformedValues(row, col) = (meta.rescaleSlope * data.UInt16Value(offset)) + meta.rescaleIntercept
+		        transformedValues(row, col) = (meta.rescaleSlope * rawValue) + meta.rescaleIntercept
 		        ' Apply the windowing levels to this transformed pixel value (if not black)
 		        if transformedValues(row, col) > minThreshold then
 		          surface.pixel(col, row) = MonochromePixelColourAfterWindowing(transformedValues(row, col), _
@@ -84,8 +87,9 @@ Protected Module PixelData
 		  case meta.SIGNED_16_BIT
 		    for row = 0 to maxRows
 		      for col = 0 to maxCols
+		        rawValue = data.Int16Value(offset)
 		        ' Apply the rescale slope and intercept transformation to the raw value and store it
-		        transformedValues(row, col) = (meta.rescaleSlope * data.Int16Value(offset)) + meta.rescaleIntercept
+		        transformedValues(row, col) = (meta.rescaleSlope * rawValue) + meta.rescaleIntercept
 		        ' Apply the windowing levels to this transformed pixel value (if not black)
 		        if transformedValues(row, col) > minThreshold then
 		          surface.pixel(col, row) = MonochromePixelColourAfterWindowing(transformedValues(row, col), _
